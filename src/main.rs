@@ -107,6 +107,21 @@ fn parse_image(raw: &[u8], name: &str) {
     assert!(input.pos == input.data.len() || _unk1 == 0);
 }
 
+fn padded_string(raw: &[u8]) -> String {
+    let null_term = raw.iter().position(|&v| v == 0).unwrap_or(raw.len());
+    String::from_utf8_lossy(raw.split_at(null_term).0).to_string()
+}
+
+struct Mesh {
+    texture: String,
+    name: String,
+    index_count: u16,
+    vertex_count: u16,
+
+    index_buf: Vec<[u16; 3]>,
+    vertex_buf: Vec<[f32; 9]>,
+}
+
 fn parse_geometry(raw: &[u8], name: &str) {
     let mut input = ArchiveCursor { data: raw, pos: 0 };
 
@@ -114,12 +129,9 @@ fn parse_geometry(raw: &[u8], name: &str) {
     assert_eq!(magic, b"BGGF");
 
     let _unk1 = input.read_u32();
-    if _unk1 != 3 {
-        return;
-    }
-    let num_indicies = input.read_u32();
+    let _idx_total = input.read_u32();
     let _unk3 = input.read_u32();
-    let num_textures = input.read_u32();
+    let num_meshes = input.read_u32();
     let _unk5 = input.read_u32();
 
     let mut bbox = vec![];
@@ -127,63 +139,85 @@ fn parse_geometry(raw: &[u8], name: &str) {
         bbox.push([input.read_f32(), input.read_f32(), input.read_f32()]);
     }
 
-    let mut textures = vec![];
-    for _ in 0..num_textures {
-        // TODO: Determine what all the values mean
-        let data = input.read_slice(112);
+    let mut mesh_list = vec![];
+    for _ in 0..num_meshes {
+        let texture = padded_string(input.read_slice(50));
+        let name = padded_string(input.read_slice(40));
 
-        let null_term = data.iter().position(|&v| v == 0).unwrap();
+        let _unk_mesh_1 = input.read_u32();
+        let _unk_mesh_2 = input.read_u32();
 
-        textures.push(String::from_utf8_lossy(&data.split_at(null_term).0).to_string());
+        let vertex_count = input.read_u16();
+        let _unk_mesh_3 = input.read_u16();
+        let index_count = input.read_u16();
+        let _unk_mesh_4 = input.read_u16();
+
+        // Might not be u16 values
+        let _unk_mesh_5 = input.read_u16();
+        let _unk_mesh_6 = input.read_u16();
+        let _unk_mesh_7 = input.read_u16();
+
+        mesh_list.push(Mesh {
+            texture,
+            name,
+            index_count,
+            vertex_count,
+
+            index_buf: vec![],
+            vertex_buf: vec![],
+        });
     }
 
-    let mut indices = vec![];
-    for _ in 0..num_indicies {
-        indices.push([input.read_u16(), input.read_u16(), input.read_u16()]);
-    }
-
-    let mut max_vert = 0;
-    for set in &indices {
-        for index in set {
-            max_vert = max_vert.max(*index);
+    for mesh in &mut mesh_list {
+        for _ in 0..mesh.index_count {
+            mesh.index_buf
+                .push([input.read_u16(), input.read_u16(), input.read_u16()]);
         }
     }
 
-    let mut verticies = vec![];
-    for _ in 0..=max_vert {
-        let mut set = [0f32; 9];
-        for i in 0..set.len() {
-            set[i] = input.read_f32();
+    for mesh in &mut mesh_list {
+        for _ in 0..mesh.vertex_count {
+            let mut set = [0f32; 9];
+            for i in 0..set.len() {
+                set[i] = input.read_f32();
+            }
+            mesh.vertex_buf.push(set);
         }
-        verticies.push(set);
     }
 
     // Janky obj output
     let mut out = File::create(format!("out/{}.obj", name)).unwrap();
 
-    for vert in &verticies {
-        out.write_all(format!("v {} {} {}\n", vert[0], vert[1], vert[2]).as_bytes())
+    let mut vert_start: usize = 1;
+    for mesh in &mesh_list {
+        out.write_all(format!("g {}\n", mesh.name).as_bytes())
             .unwrap();
-    }
-    for vert in &verticies {
-        out.write_all(format!("vt {} {}\n", vert[4], vert[5]).as_bytes())
-            .unwrap();
-    }
+        for vert in &mesh.vertex_buf {
+            out.write_all(format!("v {} {} {}\n", vert[0], vert[1], vert[2]).as_bytes())
+                .unwrap();
+        }
+        for vert in &mesh.vertex_buf {
+            out.write_all(format!("vt {} {}\n", vert[4], vert[5]).as_bytes())
+                .unwrap();
+        }
 
-    for set in indices {
-        out.write_all(
-            format!(
-                "f {}/{} {}/{} {}/{}\n",
-                set[0] + 1,
-                set[0] + 1,
-                set[1] + 1,
-                set[1] + 1,
-                set[2] + 1,
-                set[2] + 1
+        for set in &mesh.index_buf {
+            out.write_all(
+                format!(
+                    "f {}/{} {}/{} {}/{}\n",
+                    vert_start + set[0] as usize,
+                    vert_start + set[0] as usize,
+                    vert_start + set[1] as usize,
+                    vert_start + set[1] as usize,
+                    vert_start + set[2] as usize,
+                    vert_start + set[2] as usize,
+                )
+                .as_bytes(),
             )
-            .as_bytes(),
-        )
-        .unwrap();
+            .unwrap();
+        }
+
+        vert_start += mesh.vertex_count as usize;
     }
 }
 
