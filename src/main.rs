@@ -6,9 +6,12 @@ use std::path::Path;
 mod reader;
 mod texture;
 
+use clap::Arg;
 use clap::{arg, Command};
 // Utility for reading in data
 use reader::ArchiveCursor;
+
+use crate::texture::Texture;
 
 // Archive TOC Entry
 #[derive(Debug)]
@@ -36,7 +39,7 @@ struct Mesh {
     vertex_buf: Vec<[f32; 9]>,
 }
 
-fn parse_geometry(raw: &[u8], name: &str) {
+fn parse_geometry(raw: &[u8], out_dir: &Path, name: &str) {
     let mut input = ArchiveCursor { data: raw, pos: 0 };
 
     let magic = input.read_slice(4);
@@ -100,7 +103,7 @@ fn parse_geometry(raw: &[u8], name: &str) {
     }
 
     // Janky obj output
-    let mut out = File::create(format!("out/{}.obj", name)).unwrap();
+    let mut out = File::create(out_dir.join(format!("{}.obj", name))).unwrap();
 
     let mut vert_start: usize = 1;
     for mesh in &mesh_list {
@@ -135,7 +138,7 @@ fn parse_geometry(raw: &[u8], name: &str) {
     }
 }
 
-fn extract_archive(data: &[u8], out: &Path) {
+fn extract_archive(data: &[u8], decode: bool, out: &Path) {
     let mut archive = ArchiveCursor { data, pos: 0 };
 
     let version = archive.read_u32();
@@ -147,12 +150,12 @@ fn extract_archive(data: &[u8], out: &Path) {
 
     let mut entries = vec![];
     for _ in 0..num_entries {
-        let unknown = archive.read_u32();
+        let timestamp = archive.read_u32();
         let size = archive.read_u32();
         let filename_len = archive.read_u32();
         let name = archive.read_string(filename_len as usize);
         entries.push(Entry {
-            timestamp: unknown,
+            timestamp,
             size,
             name,
         });
@@ -167,17 +170,80 @@ fn extract_archive(data: &[u8], out: &Path) {
         // Extract raw asset
         std::fs::write(out.join(&entry.name), slice).unwrap();
 
-        // Decompile assets
-        if entry.name.ends_with(".btf") {
-            // Texture
-            let tex = texture::Texture::load(slice).to_image();
+        if decode {
+            // Decompile assets
+            if entry.name.ends_with(".btf") {
+                // Texture
+                let tex = texture::Texture::load(slice).to_png();
 
-            std::fs::write(out.join(format!("{}.png", &entry.name)), &tex[0]).unwrap();
-        } else if entry.name.ends_with(".geo") {
-            // Geometry
-            parse_geometry(slice, &entry.name);
+                std::fs::write(out.join(format!("{}.png", &entry.name)), &tex[0]).unwrap();
+            } else if entry.name.ends_with(".geo") {
+                // Geometry
+                parse_geometry(slice, out, &entry.name);
+            }
         }
     }
+}
+
+fn pack_archive(out: &Path, src: &[&Path]) {
+    let mut toc: Vec<Entry> = vec![];
+    let mut data = vec![];
+
+    for dir in src {
+        'outer: for file in std::fs::read_dir(dir).unwrap().into_iter() {
+            let path = file.unwrap().path();
+            if !path.is_file() {
+                continue;
+            }
+
+            let mut f = File::open(&path).expect("Failed to open source file");
+            let mut raw = vec![];
+            f.read_to_end(&mut raw).expect("Failed to read source file");
+
+            let mut name = path.file_name().unwrap().to_string_lossy().to_string();
+            let to_add = if name.ends_with(".png") {
+                name = name.strip_suffix(".png").unwrap().to_string();
+
+                let tex = Texture::from_png(&raw, 0);
+                tex.to_raw()
+            } else {
+                raw
+            };
+
+            println!("Packed {} -> {}", &path.to_string_lossy(), name);
+
+            for entry in &toc {
+                // Don't add the same filename twice
+                if entry.name == name {
+                    continue 'outer;
+                }
+            }
+
+            toc.push(Entry {
+                timestamp: 946731600, // Year 2000 UTC
+                name,
+                size: to_add.len() as u32,
+            });
+            data.extend(to_add);
+        }
+    }
+
+    let mut archive = File::create(out).expect("Unable to create archive file");
+    archive.write_all(&2u32.to_le_bytes()).unwrap(); // Version
+    archive
+        .write_all(&(toc.len() as u32).to_le_bytes())
+        .unwrap(); // Entry count
+
+    for entry in &toc {
+        archive.write_all(&entry.timestamp.to_le_bytes()).unwrap();
+        archive.write_all(&entry.size.to_le_bytes()).unwrap();
+        archive
+            .write_all(&(entry.name.len() as u32).to_le_bytes())
+            .unwrap();
+        archive.write_all(&entry.name.as_bytes()).unwrap();
+    }
+
+    archive.write_all(&data).unwrap();
 }
 
 fn main() {
@@ -186,15 +252,37 @@ fn main() {
         .subcommand_required(true)
         .subcommand(
             Command::new("extract")
-                .about("Extract an bgd archive")
+                .about("Extract a bgd archive")
+                .arg(
+                    Arg::new("raw")
+                        .num_args(0)
+                        .value_parser(clap::value_parser!(bool))
+                        .default_missing_value("true")
+                        .default_value("false")
+                        .long("raw")
+                        .short('r')
+                        .help("Disables automatic decoding of files into modern formats"),
+                )
                 .arg(arg!(<archive> "Archive to extract"))
                 .arg(arg!(<out> "Folder to extract to")),
+        )
+        .subcommand(
+            Command::new("pack")
+                .about("Pack a bgd archive")
+                .arg(arg!(<out> "Output destination"))
+                .arg(
+                    Arg::new("input")
+                        .help("Directories containing contents to pack. Earlier directories are chosen for conflicting files")
+                        .required(true)
+                        .num_args(1..),
+                ),
         );
 
     let args = command.get_matches();
     if let Some(extract_args) = args.subcommand_matches("extract") {
         let archive_filename: &String = extract_args.get_one("archive").unwrap();
         let out_directory: &String = extract_args.get_one("out").unwrap();
+        let should_decode = !*extract_args.get_one::<bool>("raw").unwrap();
 
         let mut file = File::open(archive_filename).expect("Failed to open archive");
         let mut raw = vec![];
@@ -205,6 +293,22 @@ fn main() {
             std::fs::create_dir(output_path).expect("Failed to create output directory");
         }
 
-        extract_archive(&raw, &output_path);
+        extract_archive(&raw, should_decode, &output_path);
+    } else if let Some(pack_args) = args.subcommand_matches("pack") {
+        let archive_filename: &Path = Path::new(pack_args.get_one::<String>("out").unwrap());
+        let source_directories: Vec<&Path> = pack_args
+            .get_many::<String>("input")
+            .unwrap()
+            .map(|x| Path::new(x))
+            .collect();
+
+        for path in &source_directories {
+            if !path.exists() || !path.is_dir() {
+                eprintln!("Directory {} does not exist!", path.to_string_lossy());
+                return;
+            }
+        }
+
+        pack_archive(archive_filename, &source_directories);
     }
 }

@@ -1,4 +1,6 @@
-use image::ImageBuffer;
+use std::collections::HashSet;
+
+use image::{imageops::FilterType, GenericImageView, ImageBuffer};
 
 use crate::reader::ArchiveCursor;
 
@@ -73,8 +75,119 @@ impl Texture {
         tex
     }
 
+    pub fn from_png(raw: &[u8], mip_levels: u16) -> Texture {
+        let mut image = image::ImageReader::new(std::io::Cursor::new(raw));
+        image.set_format(image::ImageFormat::Png);
+        let image = image.decode().expect("Failed to open source png");
+
+        let mut texture = Texture {
+            kind: 2,
+            height: image.height() as u16,
+            width: image.width() as u16,
+            _unk1: 256,
+            mip_count: mip_levels,
+            ..Default::default()
+        };
+
+        // Determine required bpp value
+        let mut color_set = HashSet::new();
+        let mut has_alpha = true;
+        for (_x, _y, pixel) in image.pixels() {
+            if pixel[3] != 255 {
+                // Alpha values require 32bpp
+                has_alpha = true;
+                break;
+            }
+
+            color_set.insert(pixel);
+        }
+
+        if has_alpha {
+            texture.bpp = 32;
+        } else if color_set.len() > 256 {
+            texture.bpp = 24;
+        } else {
+            if mip_levels == 0 {
+                //texture.bpp = 8;
+                texture.bpp = 24;
+            } else {
+                // TODO: Support downsampling textures with colormaps
+                texture.bpp = 24;
+            }
+        }
+
+        // Mipmap size
+        let mut m_width = image.width();
+        let mut m_height = image.height();
+
+        // Mip levels are only valid on textures with power of two dimensions
+        assert!(mip_levels == 0 || (m_width.is_power_of_two() && m_height.is_power_of_two()));
+
+        for _ in 0..(mip_levels + 1) {
+            let mut out =
+                vec![0u8; (texture.bpp / 8) as usize * m_width as usize * m_height as usize];
+            let to_convert = image.resize(m_width, m_height, FilterType::Lanczos3);
+
+            for (x, y, pixel) in to_convert.pixels() {
+                let (real_x, real_y) = (x as usize, m_height as usize - y as usize - 1);
+                let off = (texture.bpp / 8) as usize * ((real_y * m_width as usize) + real_x);
+
+                match texture.bpp {
+                    8 => {
+                        todo!("Encode 8bpp textures");
+                    }
+                    24 => {
+                        out[off] = pixel[0];
+                        out[off + 1] = pixel[1];
+                        out[off + 2] = pixel[2];
+                    }
+                    32 => {
+                        out[off] = pixel[0];
+                        out[off + 1] = pixel[1];
+                        out[off + 2] = pixel[2];
+                        out[off + 3] = pixel[3];
+                    }
+                    _ => unreachable!(),
+                }
+            }
+
+            texture.image.push(out);
+
+            m_width /= 2;
+            m_height /= 2;
+        }
+
+        texture
+    }
+
+    /// Converts a Texture object into the btf format used by Redline
+    pub fn to_raw(&self) -> Vec<u8> {
+        let mut out = vec![];
+
+        out.extend(self.kind.to_le_bytes());
+        out.extend(self.height.to_le_bytes());
+        out.extend(self.width.to_le_bytes());
+        out.extend(self.bpp.to_le_bytes());
+        out.extend(self._unk1.to_le_bytes());
+        out.extend(self.mip_count.to_le_bytes());
+
+        if let Some(colormap) = self.colormap {
+            for color in colormap {
+                for val in color {
+                    out.extend(val.to_le_bytes());
+                }
+            }
+        }
+
+        for image in &self.image {
+            out.extend(image);
+        }
+
+        out
+    }
+
     /// Converts all mip levels of a Texture into png-formated images
-    pub fn to_image(&self) -> Vec<Vec<u8>> {
+    pub fn to_png(&self) -> Vec<Vec<u8>> {
         // Mipmap level dimensions
         let mut m_width = self.width;
         let mut m_height = self.height;
