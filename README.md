@@ -11,3 +11,7 @@ This tool can currently extract all contents successfully, though not all intern
 formats are interpreted. Currently the following formats can be interpreted:
 - wav audio (stored verbatim in archive)
 - btf textures (automatically converted to png)
+
+In progress:
+- geo models (automatically converted to obj) Simple models export well, larger models have lots of broken geometry
+

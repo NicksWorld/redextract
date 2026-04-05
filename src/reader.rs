@@ -22,6 +22,12 @@ impl<'a> ArchiveCursor<'a> {
         x
     }
 
+    pub fn read_f32(&mut self) -> f32 {
+        let x = f32::from_le_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap());
+        self.pos += 4;
+        x
+    }
+
     pub fn read_string(&mut self, len: usize) -> String {
         let x = String::from_utf8_lossy(&self.data[self.pos..self.pos + len]);
         self.pos += len;

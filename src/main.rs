@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::Read;
+use std::io::Write;
 use std::path::Path;
 
 mod reader;
@@ -106,6 +107,86 @@ fn parse_image(raw: &[u8], name: &str) {
     assert!(input.pos == input.data.len() || _unk1 == 0);
 }
 
+fn parse_geometry(raw: &[u8], name: &str) {
+    let mut input = ArchiveCursor { data: raw, pos: 0 };
+
+    let magic = input.read_slice(4);
+    assert_eq!(magic, b"BGGF");
+
+    let _unk1 = input.read_u32();
+    if _unk1 != 3 {
+        return;
+    }
+    let num_indicies = input.read_u32();
+    let _unk3 = input.read_u32();
+    let num_textures = input.read_u32();
+    let _unk5 = input.read_u32();
+
+    let mut bbox = vec![];
+    for _ in 0..4 {
+        bbox.push([input.read_f32(), input.read_f32(), input.read_f32()]);
+    }
+
+    let mut textures = vec![];
+    for _ in 0..num_textures {
+        // TODO: Determine what all the values mean
+        let data = input.read_slice(112);
+
+        let null_term = data.iter().position(|&v| v == 0).unwrap();
+
+        textures.push(String::from_utf8_lossy(&data.split_at(null_term).0).to_string());
+    }
+
+    let mut indices = vec![];
+    for _ in 0..num_indicies {
+        indices.push([input.read_u16(), input.read_u16(), input.read_u16()]);
+    }
+
+    let mut max_vert = 0;
+    for set in &indices {
+        for index in set {
+            max_vert = max_vert.max(*index);
+        }
+    }
+
+    let mut verticies = vec![];
+    for _ in 0..=max_vert {
+        let mut set = [0f32; 9];
+        for i in 0..set.len() {
+            set[i] = input.read_f32();
+        }
+        verticies.push(set);
+    }
+
+    // Janky obj output
+    let mut out = File::create(format!("out/{}.obj", name)).unwrap();
+
+    for vert in &verticies {
+        out.write_all(format!("v {} {} {}\n", vert[0], vert[1], vert[2]).as_bytes())
+            .unwrap();
+    }
+    for vert in &verticies {
+        out.write_all(format!("vt {} {}\n", vert[4], vert[5]).as_bytes())
+            .unwrap();
+    }
+
+    for set in indices {
+        out.write_all(
+            format!(
+                "f {}/{} {}/{} {}/{}\n",
+                set[0] + 1,
+                set[0] + 1,
+                set[1] + 1,
+                set[1] + 1,
+                set[2] + 1,
+                set[2] + 1
+            )
+            .as_bytes(),
+        )
+        .unwrap();
+    }
+}
+
 fn extract_archive(data: &[u8], out: &Path) {
     let mut archive = ArchiveCursor { data, pos: 0 };
 
@@ -133,6 +214,8 @@ fn extract_archive(data: &[u8], out: &Path) {
     for entry in entries {
         let slice = archive.read_slice(entry.size as usize);
 
+        println!("Extracting {}", &entry.name);
+
         // Extract raw asset
         std::fs::write(out.join(&entry.name), slice).unwrap();
 
@@ -140,6 +223,9 @@ fn extract_archive(data: &[u8], out: &Path) {
         if entry.name.ends_with(".btf") {
             // Texture
             parse_image(slice, &entry.name);
+        } else if entry.name.ends_with(".geo") {
+            // Geometry
+            parse_geometry(slice, &entry.name);
         }
     }
 }
