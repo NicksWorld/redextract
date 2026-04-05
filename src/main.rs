@@ -171,13 +171,15 @@ fn extract_archive(data: &[u8], decode: bool, out: &Path) {
         std::fs::write(out.join(&entry.name), slice).unwrap();
 
         if decode {
+            let lower = entry.name.to_lowercase();
+
             // Decompile assets
-            if entry.name.ends_with(".btf") {
+            if lower.ends_with(".btf") {
                 // Texture
                 let tex = texture::Texture::load(slice).to_png();
 
                 std::fs::write(out.join(format!("{}.png", &entry.name)), &tex[0]).unwrap();
-            } else if entry.name.ends_with(".geo") {
+            } else if lower.ends_with(".geo") {
                 // Geometry
                 parse_geometry(slice, out, &entry.name);
             }
@@ -201,8 +203,8 @@ fn pack_archive(out: &Path, src: &[&Path]) {
             f.read_to_end(&mut raw).expect("Failed to read source file");
 
             let mut name = path.file_name().unwrap().to_string_lossy().to_string();
-            let to_add = if name.ends_with(".png") {
-                name = name.strip_suffix(".png").unwrap().to_string();
+            let to_add = if name.to_lowercase().ends_with(".png") {
+                name = name[0..name.len() - 4].to_string();
 
                 let tex = Texture::from_png(&raw, 0);
                 tex.to_raw()
