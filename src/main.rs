@@ -62,6 +62,12 @@ fn extract_archive(data: &[u8], decode: bool, out: &Path) {
 
             // Decompile assets
             if lower.ends_with(".btf") {
+                if entry.name.starts_with("railbtm2") {
+                    // Texture doesn't decode correctly, and causes garbage data in-game
+                    // Assume broken file, and don't extract
+                    return;
+                }
+
                 // Texture
                 let tex = texture::Texture::load(slice).to_png();
 
