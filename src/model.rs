@@ -67,16 +67,17 @@ impl Model {
         model.idx_total = input.read_u32();
         model.vert_total = input.read_u32();
         model.mesh_count = input.read_u32();
-        model._unk2 = input.read_u32();
+        if model._unk1 != 1 {
+            // The additional value is not present when _unk1 is 1, only when 2 or 3
+            // _unk1 is 1 only for shadow models
+            model._unk2 = input.read_u32();
+        }
 
         // Bounding box?
         for i in 0..4 {
             model.bbox[i] = [input.read_f32(), input.read_f32(), input.read_f32()];
         }
 
-        // TODO: Figure out why shadow models have an incorrect count
-        model.vert_total = 0;
-        model.idx_total = 0;
         // Mesh TOC entry
         for _ in 0..model.mesh_count {
             let mut mesh = MeshEntry::default();
@@ -87,18 +88,14 @@ impl Model {
             mesh._unk2 = input.read_u32();
 
             mesh.vertex_count = input.read_u16();
-            model.vert_total += mesh.vertex_count as u32; // TODO: Revert this
             mesh._unk3 = input.read_u16();
             mesh.index_count = input.read_u16();
-            model.idx_total += mesh.index_count as u32; // TODO: Revert this
 
             mesh._unk4 = input.read_u32();
             mesh._unk5 = input.read_u32();
 
             model.mesh_entries.push(mesh)
         }
-
-        println!("{:#?}", model);
 
         // Indices
         for _ in 0..model.idx_total {

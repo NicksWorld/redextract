@@ -10,8 +10,8 @@ The file begins with a header in the following format:
 | u32 | idx_count | Number of triangle indicies across all meshes |
 | u32 | vert_count | Number of verticies across all meshes |
 | u32 | mesh_count | Number of meshes contained within the model |
-| u32 | unk3 | Unknown |
-| f32[4][3] | bbox | Bounding box? |
+| u32 | unk3 | Unknown, not present when unk1 == 1 |
+| f32[3][4] | bbox | Bounding box? |
 
 Following the header the mesh entry block begins. The number of entries is defined
 by `mesh_count` in the header. The mesh entries have the following format:
