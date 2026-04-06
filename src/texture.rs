@@ -137,14 +137,14 @@ impl Texture {
                         todo!("Encode 8bpp textures");
                     }
                     24 => {
-                        out[off] = pixel[0];
+                        out[off] = pixel[2];
                         out[off + 1] = pixel[1];
-                        out[off + 2] = pixel[2];
+                        out[off + 2] = pixel[0];
                     }
                     32 => {
-                        out[off] = pixel[0];
+                        out[off] = pixel[2];
                         out[off + 1] = pixel[1];
-                        out[off + 2] = pixel[2];
+                        out[off + 2] = pixel[0];
                         out[off + 3] = pixel[3];
                     }
                     _ => unreachable!(),
@@ -209,13 +209,13 @@ impl Texture {
                 match self.bpp {
                     8 => {
                         let color = self.colormap.unwrap()[raw[off] as usize];
-                        *pixel = image::Rgba([color[0], color[1], color[2], 255]);
+                        *pixel = image::Rgba([color[2], color[1], color[0], 255]);
                     }
                     24 => {
-                        *pixel = image::Rgba([raw[off], raw[off + 1], raw[off + 2], 255]);
+                        *pixel = image::Rgba([raw[off + 2], raw[off + 1], raw[off], 255]);
                     }
                     32 => {
-                        *pixel = image::Rgba([raw[off], raw[off + 1], raw[off + 2], raw[off + 3]]);
+                        *pixel = image::Rgba([raw[off + 2], raw[off + 1], raw[off], raw[off + 3]]);
                     }
                     _ => todo!("Unknown bpp: {}", self.bpp),
                 }
