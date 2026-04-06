@@ -11,7 +11,7 @@ The file begins with a header in the following format:
 | u32 | vert_count | Number of verticies across all meshes |
 | u32 | mesh_count | Number of meshes contained within the model |
 | u32 | unk3 | Unknown |
-| f32[4] | bbox | Bounding box? |
+| f32[4][3] | bbox | Bounding box? |
 
 Following the header the mesh entry block begins. The number of entries is defined
 by `mesh_count` in the header. The mesh entries have the following format:
