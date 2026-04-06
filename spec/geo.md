@@ -43,6 +43,6 @@ in the order of their respective meshes. Each vertex has the following format:
 | u32 | color | Vertex Color stored in BGRA. Alpha appears unused. |
 | f32 | u | Texture Coordinate U |
 | f32 | v | Texture Coordinate V |
-| f32 | unk1 | Unknown |
-| f32 | unk2 | Unknown |
-| f32 | unk3 | Unknown |
+| f32 | nx | Normal X |
+| f32 | ny | Normal Y |
+| f32 | nz | Normal Z |
