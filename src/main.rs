@@ -3,6 +3,7 @@ use std::io::Read;
 use std::io::Write;
 use std::path::Path;
 
+mod model;
 mod reader;
 mod texture;
 
@@ -22,185 +23,6 @@ struct Entry {
     size: u32,
     // Filename
     name: String,
-}
-
-fn padded_string(raw: &[u8]) -> String {
-    let null_term = raw.iter().position(|&v| v == 0).unwrap_or(raw.len());
-    String::from_utf8_lossy(raw.split_at(null_term).0).to_string()
-}
-
-struct Mesh {
-    texture: String,
-    name: String,
-    index_count: u16,
-    vertex_count: u16,
-
-    index_buf: Vec<[u16; 3]>,
-    vertex_buf: Vec<Vertex>,
-}
-
-struct Vertex {
-    x: f32,
-    y: f32,
-    z: f32,
-    // Stored in BGRA, alpha unused
-    color: u32,
-    u: f32,
-    v: f32,
-    // Verify
-    nx: f32,
-    ny: f32,
-    nz: f32,
-}
-
-fn parse_geometry(raw: &[u8], out_dir: &Path, name: &str) {
-    let mut input = ArchiveCursor { data: raw, pos: 0 };
-
-    let magic = input.read_slice(4);
-    assert_eq!(magic, b"BGGF");
-
-    let _unk1 = input.read_u32();
-    let _idx_total = input.read_u32();
-    let _vert_total = input.read_u32();
-    let num_meshes = input.read_u32();
-    let _unk5 = input.read_u32();
-
-    let mut bbox = vec![];
-    for _ in 0..4 {
-        bbox.push([input.read_f32(), input.read_f32(), input.read_f32()]);
-    }
-
-    let mut mesh_list = vec![];
-    for _ in 0..num_meshes {
-        let texture = padded_string(input.read_slice(50));
-        let name = padded_string(input.read_slice(40));
-
-        let _unk_mesh_1 = input.read_u32();
-        let _unk_mesh_2 = input.read_u32();
-
-        println!("{}", name);
-        let vertex_count = input.read_u16();
-        let _unk_mesh_3 = input.read_u16();
-        let index_count = input.read_u16();
-        let _unk_mesh_4 = input.read_u16();
-
-        // Might not be u16 values
-        let _unk_mesh_5 = input.read_u16();
-        let _unk_mesh_6 = input.read_u16();
-        let _unk_mesh_7 = input.read_u16();
-
-        mesh_list.push(Mesh {
-            texture,
-            name,
-            index_count,
-            vertex_count,
-
-            index_buf: vec![],
-            vertex_buf: vec![],
-        });
-    }
-
-    for mesh in &mut mesh_list {
-        for _ in 0..mesh.index_count {
-            mesh.index_buf
-                .push([input.read_u16(), input.read_u16(), input.read_u16()]);
-        }
-    }
-
-    for mesh in &mut mesh_list {
-        for _ in 0..mesh.vertex_count {
-            mesh.vertex_buf.push(Vertex {
-                x: input.read_f32(),
-                y: input.read_f32(),
-                z: input.read_f32(),
-                color: input.read_u32(),
-                u: input.read_f32(),
-                v: input.read_f32(),
-                nx: input.read_f32(),
-                ny: input.read_f32(),
-                nz: input.read_f32(),
-            });
-        }
-    }
-
-    // Material
-    let mut out = File::create(out_dir.join(format!("{}.mtl", name))).unwrap();
-    out.write_all(b"newmtl _Default\n").unwrap();
-    for mesh in &mesh_list {
-        if mesh.texture.len() > 4 {
-            out.write_all(format!("newmtl {}\n", mesh.texture).as_bytes())
-                .unwrap();
-            out.write_all(
-                format!(
-                    "map_Kd {}.btf.png\n",
-                    &mesh.texture[0..mesh.texture.len() - 4]
-                )
-                .as_bytes(),
-            )
-            .unwrap();
-        }
-    }
-
-    // Janky obj output
-    let mut out = File::create(out_dir.join(format!("{}.obj", name))).unwrap();
-
-    out.write_all(format!("mtllib {}.mtl\n", name).as_bytes())
-        .unwrap();
-
-    let mut vert_start: usize = 1;
-    for mesh in &mesh_list {
-        out.write_all(format!("g {}\n", mesh.name).as_bytes())
-            .unwrap();
-        out.write_all(
-            format!(
-                "usemtl {}\n",
-                if mesh.texture.len() == 0 {
-                    "_Default"
-                } else {
-                    &mesh.texture
-                }
-            )
-            .as_bytes(),
-        )
-        .unwrap();
-        for vert in &mesh.vertex_buf {
-            let color = vert.color.to_le_bytes();
-            let b = color[0] as f32 / 255f32;
-            let g = color[1] as f32 / 255f32;
-            let r = color[2] as f32 / 255f32;
-            out.write_all(
-                format!("v {} {} {} {} {} {}\n", -vert.x, vert.y, vert.z, r, g, b).as_bytes(),
-            )
-            .unwrap();
-        }
-        for vert in &mesh.vertex_buf {
-            out.write_all(format!("vt {} {}\n", vert.u, vert.v).as_bytes())
-                .unwrap();
-        }
-        for vert in &mesh.vertex_buf {
-            out.write_all(format!("vn {} {} {}\n", vert.nx, vert.ny, vert.nz).as_bytes())
-                .unwrap();
-        }
-
-        for set in &mesh.index_buf {
-            let format_vert = |x: u16| {
-                let y = vert_start + x as usize;
-                format!("{}/{}/{}", y, y, y)
-            };
-            out.write_all(
-                format!(
-                    "f {} {} {}\n",
-                    format_vert(set[0]),
-                    format_vert(set[1]),
-                    format_vert(set[2])
-                )
-                .as_bytes(),
-            )
-            .unwrap();
-        }
-
-        vert_start += mesh.vertex_count as usize;
-    }
 }
 
 fn extract_archive(data: &[u8], decode: bool, out: &Path) {
@@ -246,7 +68,15 @@ fn extract_archive(data: &[u8], decode: bool, out: &Path) {
                 std::fs::write(out.join(format!("{}.png", &entry.name)), &tex[0]).unwrap();
             } else if lower.ends_with(".geo") {
                 // Geometry
-                parse_geometry(slice, out, &entry.name);
+                //parse_geometry(slice, out, &entry.name);
+
+                let model = model::Model::load(slice);
+
+                let mtl = model.to_mtl();
+                let obj = model.to_obj(&entry.name);
+
+                std::fs::write(out.join(format!("{}.mtl", &entry.name)), &mtl).unwrap();
+                std::fs::write(out.join(format!("{}.obj", &entry.name)), &obj).unwrap();
             }
         }
     }
