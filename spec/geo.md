@@ -8,7 +8,7 @@ The file begins with a header in the following format:
 | char[4] | magic | Always "BGGF" |
 | u32 | unk1 | Unknown |
 | u32 | idx_count | Number of triangle indicies across all meshes |
-| u32 | unk2 | Unknown |
+| u32 | vert_count | Number of verticies across all meshes |
 | u32 | mesh_count | Number of meshes contained within the model |
 | u32 | unk3 | Unknown |
 | f32[4] | bbox | Bounding box? |
@@ -33,9 +33,16 @@ Following the mesh list, the index block begins. It contains triangle indicies s
 as sets of 3 u16 values. These are stored per mesh, with `index_count` sets belonging
 to their respective mesh. They are stored sequentially in order of mesh entries.
 
-Following the index block, the vertex block begins. It contains sets of 9 f32 values
-per vertex, stored per mesh sequentially, with `vertex_count` defining the number
-of vertexes belonging to their respective mesh.
-
-The first three floats per mesh define the X, Y, and Z coordinates of the point.
-The 5th and 6th floats define the UV coordinates of the vertex, used for texture mapping.
+Following the index block, the vertex block begins. The verticies are stored sequentially,
+in the order of their respective meshes. Each vertex has the following format:
+| type | name | description |
+| ----- | ---- | ------- |
+| f32 | x | World Coordinate X (negated) |
+| f32 | y | World Coordinate Y |
+| f32 | z | World Coordinate Z |
+| u32 | color | Vertex Color stored in BGRA. Alpha appears unused. |
+| f32 | u | Texture Coordinate U |
+| f32 | v | Texture Coordinate V |
+| f32 | unk1 | Unknown |
+| f32 | unk2 | Unknown |
+| f32 | unk3 | Unknown |

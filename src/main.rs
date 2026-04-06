@@ -36,7 +36,21 @@ struct Mesh {
     vertex_count: u16,
 
     index_buf: Vec<[u16; 3]>,
-    vertex_buf: Vec<[f32; 9]>,
+    vertex_buf: Vec<Vertex>,
+}
+
+struct Vertex {
+    x: f32,
+    y: f32,
+    z: f32,
+    // Stored in BGRA, alpha unused
+    color: u32,
+    u: f32,
+    v: f32,
+    // Verify
+    nx: f32,
+    ny: f32,
+    nz: f32,
 }
 
 fn parse_geometry(raw: &[u8], out_dir: &Path, name: &str) {
@@ -47,7 +61,7 @@ fn parse_geometry(raw: &[u8], out_dir: &Path, name: &str) {
 
     let _unk1 = input.read_u32();
     let _idx_total = input.read_u32();
-    let _unk3 = input.read_u32();
+    let _vert_total = input.read_u32();
     let num_meshes = input.read_u32();
     let _unk5 = input.read_u32();
 
@@ -64,6 +78,7 @@ fn parse_geometry(raw: &[u8], out_dir: &Path, name: &str) {
         let _unk_mesh_1 = input.read_u32();
         let _unk_mesh_2 = input.read_u32();
 
+        println!("{}", name);
         let vertex_count = input.read_u16();
         let _unk_mesh_3 = input.read_u16();
         let index_count = input.read_u16();
@@ -94,40 +109,90 @@ fn parse_geometry(raw: &[u8], out_dir: &Path, name: &str) {
 
     for mesh in &mut mesh_list {
         for _ in 0..mesh.vertex_count {
-            let mut set = [0f32; 9];
-            for i in 0..set.len() {
-                set[i] = input.read_f32();
-            }
-            mesh.vertex_buf.push(set);
+            mesh.vertex_buf.push(Vertex {
+                x: input.read_f32(),
+                y: input.read_f32(),
+                z: input.read_f32(),
+                color: input.read_u32(),
+                u: input.read_f32(),
+                v: input.read_f32(),
+                nx: input.read_f32(),
+                ny: input.read_f32(),
+                nz: input.read_f32(),
+            });
+        }
+    }
+
+    // Material
+    let mut out = File::create(out_dir.join(format!("{}.mtl", name))).unwrap();
+    out.write_all(b"newmtl _Default\n").unwrap();
+    for mesh in &mesh_list {
+        if mesh.texture.len() > 4 {
+            out.write_all(format!("newmtl {}\n", mesh.texture).as_bytes())
+                .unwrap();
+            out.write_all(
+                format!(
+                    "map_Kd {}.btf.png\n",
+                    &mesh.texture[0..mesh.texture.len() - 4]
+                )
+                .as_bytes(),
+            )
+            .unwrap();
         }
     }
 
     // Janky obj output
     let mut out = File::create(out_dir.join(format!("{}.obj", name))).unwrap();
 
+    out.write_all(format!("mtllib {}.mtl\n", name).as_bytes())
+        .unwrap();
+
     let mut vert_start: usize = 1;
     for mesh in &mesh_list {
         out.write_all(format!("g {}\n", mesh.name).as_bytes())
             .unwrap();
+        out.write_all(
+            format!(
+                "usemtl {}\n",
+                if mesh.texture.len() == 0 {
+                    "_Default"
+                } else {
+                    &mesh.texture
+                }
+            )
+            .as_bytes(),
+        )
+        .unwrap();
         for vert in &mesh.vertex_buf {
-            out.write_all(format!("v {} {} {}\n", vert[0], vert[1], vert[2]).as_bytes())
+            let color = vert.color.to_le_bytes();
+            let b = color[0] as f32 / 255f32;
+            let g = color[1] as f32 / 255f32;
+            let r = color[2] as f32 / 255f32;
+            out.write_all(
+                format!("v {} {} {} {} {} {}\n", -vert.x, vert.y, vert.z, r, g, b).as_bytes(),
+            )
+            .unwrap();
+        }
+        for vert in &mesh.vertex_buf {
+            out.write_all(format!("vt {} {}\n", vert.u, vert.v).as_bytes())
                 .unwrap();
         }
         for vert in &mesh.vertex_buf {
-            out.write_all(format!("vt {} {}\n", vert[4], vert[5]).as_bytes())
+            out.write_all(format!("vn {} {} {}\n", vert.nx, vert.ny, vert.nz).as_bytes())
                 .unwrap();
         }
 
         for set in &mesh.index_buf {
+            let format_vert = |x: u16| {
+                let y = vert_start + x as usize;
+                format!("{}/{}/{}", y, y, y)
+            };
             out.write_all(
                 format!(
-                    "f {}/{} {}/{} {}/{}\n",
-                    vert_start + set[0] as usize,
-                    vert_start + set[0] as usize,
-                    vert_start + set[1] as usize,
-                    vert_start + set[1] as usize,
-                    vert_start + set[2] as usize,
-                    vert_start + set[2] as usize,
+                    "f {} {} {}\n",
+                    format_vert(set[0]),
+                    format_vert(set[1]),
+                    format_vert(set[2])
                 )
                 .as_bytes(),
             )
