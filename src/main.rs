@@ -113,14 +113,14 @@ fn pack_archive(out: &Path, src: &[&Path]) {
                 raw
             };
 
-            println!("Packed {} -> {}", &path.to_string_lossy(), name);
-
             for entry in &toc {
                 // Don't add the same filename twice
                 if entry.name == name {
                     continue 'outer;
                 }
             }
+
+            println!("Packed {} -> {}", &path.to_string_lossy(), name);
 
             toc.push(Entry {
                 timestamp: 946731600, // Year 2000 UTC

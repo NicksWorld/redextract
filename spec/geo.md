@@ -11,7 +11,7 @@ The file begins with a header in the following format:
 | u32 | vert_count | Number of verticies across all meshes |
 | u32 | mesh_count | Number of meshes contained within the model |
 | u32 | unk3 | Unknown, not present when unk1 == 1 |
-| f32[3][4] | bbox | Bounding box? |
+| f32[3][4] | bbox | Bounding boxes, first rendering, second collision |
 
 Following the header the mesh entry block begins. The number of entries is defined
 by `mesh_count` in the header. The mesh entries have the following format:
@@ -19,15 +19,27 @@ by `mesh_count` in the header. The mesh entries have the following format:
 | ---- | ---- | ----------- |
 | char[50] | texture | Filename of texture, null terminated |
 | char[40] | name | Name of mesh, null terminated |
-| u32 | unk1 | Unknown |
-| u32 | unk2 | Unknown |
+| u16 | unk1 | Unknown |
+| u32 | color | Color attachment for shader |
+| u16 | vertex_off | Offset into vertex buffer (refers to whole vertex chunk) |
 | u16 | vertex_count | Number of verticies belonging to the mesh |
-| u16 | unk3 | Unknown |
+| u16 | index_off | Offset into index buffer (refers to individual u16 indicies) |
 | u16 | index_count | Number of triangle indicies belonging to the mesh |
-| u16 | unk4 | Unknown |
+| u8 | render_flags | Bitfield, described below |
+| u8 | unk4 | Unknown |
 | u16 | unk5 | Unknown |
 | u16 | unk6 | Unknown |
 | u16 | unk7 | Unknown |
+
+Render Flags Bitfield
+| pos | name | description |
+| --- | ---- | ----------- |
+| 0..2 | unk1-3 | Unknown |
+| 3 | chrome | Renders with skybox reflections, tinted by color |
+| 4 | tint | Tints texture according to color |
+| 5 | fullbright | Renders fullbright |
+| 6 | semi-chrome | Renders semi-metalic |
+| 7 | transparent | Semi-transparent fullbright texture (additive blend?) |
 
 Following the mesh list, the index block begins. It contains triangle indicies stored
 as sets of 3 u16 values. These are stored per mesh, with `index_count` sets belonging

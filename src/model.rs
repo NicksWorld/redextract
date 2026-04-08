@@ -19,13 +19,17 @@ pub struct Model {
 pub struct MeshEntry {
     texture: String,
     name: String,
-    _unk1: u32,
-    _unk2: u32,
-    index_count: u16,
-    _unk3: u16,
+    _unk1: u16,
+    color: u32,
+    vertex_off: u16,
     vertex_count: u16,
-    _unk4: u32,
-    _unk5: u32,
+    index_off: u16,
+    index_count: u16,
+    // bitfield modifying how material is rendered. See spec/geo.md
+    flags: u8,
+    _unk4: u8,
+    _unk5: u16,
+    _unk6: u32,
 }
 
 #[derive(Debug)]
@@ -82,17 +86,24 @@ impl Model {
         for _ in 0..model.mesh_count {
             let mut mesh = MeshEntry::default();
             mesh.texture = padded_string(input.read_slice(50));
-            mesh.name = padded_string(input.read_slice(40));
+            let name_raw = input.read_slice(40);
+            assert_eq!(name_raw[39], 0);
+            mesh.name = padded_string(name_raw);
 
-            mesh._unk1 = input.read_u32();
-            mesh._unk2 = input.read_u32();
+            mesh._unk1 = input.read_u16();
 
+            mesh.color = input.read_u32();
+
+            mesh.vertex_off = input.read_u16();
             mesh.vertex_count = input.read_u16();
-            mesh._unk3 = input.read_u16();
+            mesh.index_off = input.read_u16();
             mesh.index_count = input.read_u16();
 
-            mesh._unk4 = input.read_u32();
-            mesh._unk5 = input.read_u32();
+            mesh.flags = input.read_u8();
+
+            mesh._unk4 = input.read_u8();
+            mesh._unk5 = input.read_u16();
+            mesh._unk6 = input.read_u32();
 
             model.mesh_entries.push(mesh)
         }
@@ -118,8 +129,6 @@ impl Model {
                 nz: input.read_f32(),
             });
         }
-
-        // TODO: Verify no trailing data
 
         model
     }
