@@ -4,6 +4,12 @@ pub struct ArchiveCursor<'a> {
 }
 
 impl<'a> ArchiveCursor<'a> {
+    pub fn read_u64(&mut self) -> u64 {
+        let x = u64::from_le_bytes(self.data[self.pos..self.pos + 8].try_into().unwrap());
+        self.pos += 8;
+        x
+    }
+
     pub fn read_u32(&mut self) -> u32 {
         let x = u32::from_le_bytes(self.data[self.pos..self.pos + 4].try_into().unwrap());
         self.pos += 4;

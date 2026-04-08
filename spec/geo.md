@@ -25,11 +25,7 @@ by `mesh_count` in the header. The mesh entries have the following format:
 | u16 | vertex_count | Number of verticies belonging to the mesh |
 | u16 | index_off | Offset into index buffer (refers to individual u16 indicies) |
 | u16 | index_count | Number of triangle indicies belonging to the mesh |
-| u8 | render_flags | Bitfield, described below |
-| u8 | unk4 | Unknown |
-| u16 | unk5 | Unknown |
-| u16 | unk6 | Unknown |
-| u16 | unk7 | Unknown |
+| u64 | render_flags | Bitfield, described below |
 
 Render Flags Bitfield
 | pos | name | description |
@@ -40,6 +36,8 @@ Render Flags Bitfield
 | 5 | fullbright | Renders fullbright |
 | 6 | semi-chrome | Renders semi-metalic |
 | 7 | transparent | Semi-transparent fullbright texture (additive blend?) |
+
+u64 0x0100 enables vertex coloring multiplied with texture
 
 Following the mesh list, the index block begins. It contains triangle indicies stored
 as sets of 3 u16 values. These are stored per mesh, with `index_count` sets belonging

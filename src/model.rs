@@ -26,10 +26,7 @@ pub struct MeshEntry {
     index_off: u16,
     index_count: u16,
     // bitfield modifying how material is rendered. See spec/geo.md
-    flags: u8,
-    _unk4: u8,
-    _unk5: u16,
-    _unk6: u32,
+    flags: u64,
 }
 
 #[derive(Debug)]
@@ -99,11 +96,7 @@ impl Model {
             mesh.index_off = input.read_u16();
             mesh.index_count = input.read_u16();
 
-            mesh.flags = input.read_u8();
-
-            mesh._unk4 = input.read_u8();
-            mesh._unk5 = input.read_u16();
-            mesh._unk6 = input.read_u32();
+            mesh.flags = input.read_u64();
 
             model.mesh_entries.push(mesh)
         }
