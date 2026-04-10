@@ -18,7 +18,7 @@ int unk3;
 int unk4;
 
 if (!(version < 0x12)) {
-    char unk5[0x40];
+    char evt_script[0x40];
 }
 
 if (0x28 < version) {
@@ -26,7 +26,7 @@ if (0x28 < version) {
 }
 
 if (7 < version) {
-    struct LenString unk7;
+    struct LenString skybox;
     struct LenString unk8;
     
     int16_t unk9;
@@ -54,16 +54,18 @@ if (0x1f < version) {
 
 struct Unknown1 {
     if (version < 0x1f) {
-        struct LenString STR_1;
-        struct LenString STR_2;
+        struct LenString name;
+        struct LenString texture;
     } else {
-        struct LenString STR_1;
-        struct LenString STR_2;
+        struct LenString name;
+        struct LenString texture;
         struct LenString STR_3;
     }
+    // BGR?
     uint8_t UNK1;
     uint8_t UNK2;
     uint8_t UNK3;
+
     uint32_t UNK4;
     uint32_t UNK5;
     uint32_t UNK6;
@@ -73,9 +75,9 @@ struct Unknown1 {
 };
 
 if (0x12 < version) {
-    int16_t unk21;
+    int16_t material_count;
     
-    struct Unknown1 unk22[unk21];
+    struct Unknown1 materials[material_count];
 }
 
 struct Unknown2 {
@@ -103,7 +105,7 @@ if (0x10 < version) {
 }
 
 enum <uint8_t> AssetType {
-    UNKNOWN = 0,
+    PROBABLY_MODEL = 0,
     ANIMATION = 1,
     SCRIPT_OBJECT = 2,
     // More unknown
@@ -113,11 +115,11 @@ struct Unknown3 {
     if (1 < version) {
        enum AssetType asset_type; 
     }
-    struct LenString UNK2;
+    struct LenString name;
 };
 
-uint32_t unk27;
-struct Unknown3 unk28[unk27];
+uint32_t model_count;
+struct Unknown3 models[model_count];
 
 struct Unknown4 {
     struct LenString UNK1;
