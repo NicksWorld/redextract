@@ -1,0 +1,55 @@
+struct Vector {
+				float x;
+				float y;
+				float z;
+};
+
+struct Header {
+				char magic[4];
+				char unknown[4];
+				uint32_t idx_count;
+				uint32_t vert_count;
+				uint32_t mesh_count;
+				if (unknown[3] != 0) {
+								char unknown2[4];
+				}
+				struct Vector bbox[4];
+};
+
+struct MeshEntry {
+				char texture[50];
+				char name[40];
+				char unknown[2];
+				char color_bgra[4];
+				uint16_t vertex_off;
+				uint16_t vertex_count;
+				uint16_t index_off;
+				uint16_t index_count;
+				char unknown3[8];
+};
+
+struct Index {
+				uint16_t a;
+				uint16_t b;
+				uint16_t c;
+};
+
+struct Vertex {
+				float x;
+				float y;
+				float z;
+				uint8_t blue;
+				uint8_t green;
+				uint8_t red;
+				uint8_t alpha;
+				float u;
+				float v;
+				float norm_x;
+				float norm_y;
+				float norm_z;
+};
+
+struct Header header;
+struct MeshEntry meshes[header.mesh_count];
+struct Index indices[header.idx_count] ;
+struct Vertex vertices[header.vert_count];

@@ -1,0 +1,134 @@
+struct LenString {
+    uint8_t len;
+    if (len > 0) {
+        char string[len];
+    }
+};
+
+
+char magic[3]; // WLD
+int version; // Only versions less than 0x30 are valid
+
+if (!(version < 0x25)) {
+    char unk1[0x20];
+}
+
+int unk2;
+int unk3;
+int unk4;
+
+if (!(version < 0x12)) {
+    char unk5[0x40];
+}
+
+if (0x28 < version) {
+    int16_t unk6;
+}
+
+if (7 < version) {
+    struct LenString unk7;
+    struct LenString unk8;
+    
+    int16_t unk9;
+    int16_t unk10;
+    int16_t unk11;
+
+    int unk12;
+    int unk13;
+
+    if (9 < version) {
+        struct LenString unk14;
+        int unk15;
+    }
+    if (0xb < version) {
+        int unk16;
+        int16_t unk17;
+        int16_t unk18;
+        int16_t unk19;
+    }
+}
+
+if (0x1f < version) {
+    int16_t unk20;
+}
+
+struct Unknown1 {
+    if (version < 0x1f) {
+        struct LenString STR_1;
+        struct LenString STR_2;
+    } else {
+        struct LenString STR_1;
+        struct LenString STR_2;
+        struct LenString STR_3;
+    }
+    uint8_t UNK1;
+    uint8_t UNK2;
+    uint8_t UNK3;
+    uint32_t UNK4;
+    uint32_t UNK5;
+    uint32_t UNK6;
+    uint32_t UNK7;
+    uint32_t UNK8;
+    uint32_t UNK9;
+};
+
+if (0x12 < version) {
+    int16_t unk21;
+    
+    struct Unknown1 unk22[unk21];
+}
+
+struct Unknown2 {
+    struct LenString UNK1;
+    uint8_t UNK2;
+    uint8_t UNK3;
+    uint8_t UNK4;
+    uint8_t UNK5;
+    uint8_t UNK6;
+    uint8_t UNK7;
+    uint16_t UNK8;
+    int UNK9;
+    int UNK10;
+    int UNK11;
+};
+
+if (0x27 < version) {
+    uint16_t unk23;
+    struct Unknown2 unk24[unk23];
+}
+
+if (0x10 < version) {
+    uint16_t unk25;
+    struct LenString unk26[unk25];
+}
+
+enum <uint8_t> AssetType {
+    UNKNOWN = 0,
+    ANIMATION = 1,
+    SCRIPT_OBJECT = 2,
+    // More unknown
+};
+
+struct Unknown3 {
+    if (1 < version) {
+       enum AssetType asset_type; 
+    }
+    struct LenString UNK2;
+};
+
+uint32_t unk27;
+struct Unknown3 unk28[unk27];
+
+struct Unknown4 {
+    struct LenString UNK1;
+    int UNK2;
+};
+
+if (version < 3) {
+    uint32_t unk29;
+    struct Unknown4 unk30[unk29];
+}
+if (version > 3) {
+    uint32_t unk31;
+    struct LenString unk32[unk31];
+}
