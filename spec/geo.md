@@ -25,19 +25,17 @@ by `mesh_count` in the header. The mesh entries have the following format:
 | u16 | vertex_count | Number of verticies belonging to the mesh |
 | u16 | index_off | Offset into index buffer (refers to individual u16 indicies) |
 | u16 | index_count | Number of triangle indicies belonging to the mesh |
-| u64 | render_flags | Bitfield, described below |
+| u8 | render_flags | Bitfield, described below |
+| char[4] | unk2 | Unknown |
+| u8 | blend_mode | Valid values are 0-2, and are combined with render_flags.transparent for the final value |
+| char[2] | unk3 | Unknown |
 
-Render Flags Bitfield
-| pos | name | description |
-| --- | ---- | ----------- |
-| 0..2 | unk1-3 | Unknown |
-| 3 | chrome | Renders with skybox reflections, tinted by color |
-| 4 | tint | Tints texture according to color |
-| 5 | fullbright | Renders fullbright |
-| 6 | semi-chrome | Renders semi-metalic |
-| 7 | transparent | Semi-transparent fullbright texture (additive blend?) |
-
-u64 0x0100 enables vertex coloring multiplied with texture
+| value | name | description |
+| 0x01 | Additive | Enables additive blend mode |
+| 0x02 | Envmap Blend | Enables blending with the environment map. Overriden by 0x10 |
+| 0x04 | Fullbright | Forces vertex colors to fullbright |
+| 0x08 | Tint | Forces vertex colors to mesh color |
+| 0x10 | Envmap | Sets blending to use primarily the environment map |
 
 Following the mesh list, the index block begins. It contains triangle indicies stored
 as sets of 3 u16 values. These are stored per mesh, with `index_count` sets belonging
